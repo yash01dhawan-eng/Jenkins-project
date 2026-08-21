@@ -27,6 +27,36 @@ pipeline {
             }
         }
 
+        stage('Debug Workspace') {
+            steps {
+                echo '===== Checking Jenkins Workspace ====='
+
+                sh '''
+                    echo "===== CURRENT WORKSPACE ====="
+                    pwd
+
+                    echo "===== ALL FILES ====="
+                    ls -lah
+
+                    echo "===== DOCKERFILE CHECK ====="
+                    if [ -f Dockerfile ]; then
+                        echo "Dockerfile FOUND"
+                        ls -lah Dockerfile
+                        echo "===== Dockerfile Content ====="
+                        cat Dockerfile
+                    else
+                        echo "ERROR: Dockerfile NOT FOUND"
+                    fi
+
+                    echo "===== GIT INFORMATION ====="
+                    git rev-parse --abbrev-ref HEAD
+                    git log -1 --oneline
+                '''
+
+                echo '===== Workspace Check Completed ====='
+            }
+        }
+
         stage('Manual Approval') {
             steps {
                 input(
