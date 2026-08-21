@@ -1,38 +1,68 @@
-// Custom class (Non-primitive)
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+
 class Student {
     String name;
     int age;
 
-    // Constructor
     Student(String name, int age) {
         this.name = name;
         this.age = age;
     }
 
-    // Method
     void display() {
         System.out.println("Student Name: " + name + ", Age: " + age);
     }
 }
 
-// Main class (entry point)
 public class Main {
-    public static void main(String[] args) {
 
-        // 1. String (Non-primitive)
-        String greeting = "Hello, Java!";
-        System.out.println(greeting.toUpperCase());
+    public static void main(String[] args) throws IOException {
 
-        // 2. Array (Non-primitive)
-        int[] numbers = {10, 20, 30, 40, 50};
-        System.out.println("First element: " + numbers[0]);
-
-        // 3. Object (Custom class ka object)
         Student student1 = new Student("Alice", 21);
-        student1.display();
 
-        // 4. Null reference
-        String emptyText = null;
-        System.out.println("Null reference: " + emptyText);
+        HttpServer server = HttpServer.create(
+                new InetSocketAddress("0.0.0.0", 8081),
+                0
+        );
+
+        server.createContext("/", (HttpExchange exchange) -> {
+
+            String response = """
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Jenkins Java App</title>
+                    </head>
+                    <body>
+                        <h1>Hello from Jenkins + EC2 🚀</h1>
+                        <p>Application is running successfully.</p>
+                        <p>Student Name: %s</p>
+                        <p>Student Age: %d</p>
+                    </body>
+                    </html>
+                    """.formatted(student1.name, student1.age);
+
+            exchange.getResponseHeaders().set(
+                    "Content-Type",
+                    "text/html; charset=UTF-8"
+            );
+
+            exchange.sendResponseHeaders(200, response.getBytes().length);
+
+            try (OutputStream outputStream = exchange.getResponseBody()) {
+                outputStream.write(response.getBytes());
+            }
+        });
+
+        server.start();
+
+        System.out.println("===== Application Started =====");
+        System.out.println("Server running on port 8081");
+        System.out.println("Open: http://<EC2-PUBLIC-IP>:8081");
     }
 }
