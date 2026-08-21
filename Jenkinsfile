@@ -2,6 +2,14 @@ pipeline {
 
     agent any
 
+    parameters {
+        string(
+            name: 'DEPLOY_APPROVER',
+            defaultValue: 'yash',
+            description: 'Jenkins user allowed to approve deployment'
+        )
+    }
+
     stages {
 
         stage('Build') {
@@ -21,8 +29,12 @@ pipeline {
 
         stage('Manual Approval') {
             steps {
-                input message: 'Deploy this build to EC2?', 
-                      ok: 'Approve Deployment'
+                input(
+                    id: 'deployApproval',
+                    message: "Deploy this build to EC2? Approver: ${params.DEPLOY_APPROVER}",
+                    ok: 'Approve Deployment',
+                    submitter: params.DEPLOY_APPROVER
+                )
             }
         }
 
@@ -50,6 +62,10 @@ pipeline {
 
         failure {
             echo '===== Pipeline Failed ====='
+        }
+
+        aborted {
+            echo '===== Pipeline Aborted ====='
         }
     }
 }
