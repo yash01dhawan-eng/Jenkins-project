@@ -10,6 +10,12 @@ pipeline {
         )
     }
 
+    environment {
+        IMAGE_NAME = 'javaimage'
+        CONTAINER_NAME = 'javacontainer'
+        APP_PORT = '8081'
+    }
+
     stages {
 
         stage('Build') {
@@ -27,33 +33,18 @@ pipeline {
             }
         }
 
-        stage('Debug Workspace') {
+        stage('Docker Build') {
             steps {
-                echo '===== Checking Jenkins Workspace ====='
+                echo '===== Docker Build Started ====='
 
                 sh '''
-                    echo "===== CURRENT WORKSPACE ====="
-                    pwd
-
-                    echo "===== ALL FILES ====="
-                    ls -lah
-
-                    echo "===== DOCKERFILE CHECK ====="
-                    if [ -f Dockerfile ]; then
-                        echo "Dockerfile FOUND"
-                        ls -lah Dockerfile
-                        echo "===== Dockerfile Content ====="
-                        cat Dockerfile
-                    else
-                        echo "ERROR: Dockerfile NOT FOUND"
-                    fi
-
-                    echo "===== GIT INFORMATION ====="
-                    git rev-parse --abbrev-ref HEAD
-                    git log -1 --oneline
+                    docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} .
+                    
+                    echo "===== Docker Image Created ====="
+                    docker images ${IMAGE_NAME}
                 '''
 
-                echo '===== Workspace Check Completed ====='
+                echo '===== Docker Build Completed ====='
             }
         }
 
@@ -61,25 +52,58 @@ pipeline {
             steps {
                 input(
                     id: 'deployApproval',
-                    message: "Deploy this build to EC2? Approver: ${params.DEPLOY_APPROVER}",
+                    message: "Deploy Docker build ${env.BUILD_NUMBER} to EC2? Approver: ${params.DEPLOY_APPROVER}",
                     ok: 'Approve Deployment',
                     submitter: params.DEPLOY_APPROVER
                 )
             }
         }
 
-        stage('Deploy') {
+        stage('Docker Deploy') {
             steps {
-                echo '===== Deploying Application ====='
+                echo '===== Docker Deployment Started ====='
 
                 sh '''
-                    cp target/jenkins-project-1.0.0.jar /opt/jenkins-project/app.jar
+                    echo "===== Stopping Existing Container ====="
 
-                    sudo /usr/bin/systemctl restart jenkins-project
+                    docker stop ${CONTAINER_NAME} || true
 
-                    echo "===== Deployment Completed ====="
+                    echo "===== Removing Existing Container ====="
 
-                    sudo /usr/bin/systemctl status jenkins-project --no-pager
+                    docker rm ${CONTAINER_NAME} || true
+
+                    echo "===== Starting New Container ====="
+
+                    docker run -d \
+                        --name ${CONTAINER_NAME} \
+                        -p ${APP_PORT}:${APP_PORT} \
+                        ${IMAGE_NAME}:${BUILD_NUMBER}
+
+                    echo "===== Container Status ====="
+
+                    docker ps
+
+                    echo "===== Application Logs ====="
+
+                    sleep 5
+                    docker logs ${CONTAINER_NAME}
+                '''
+
+                echo '===== Docker Deployment Completed ====='
+            }
+        }
+
+        stage('Health Check') {
+            steps {
+                echo '===== Application Health Check ====='
+
+                sh '''
+                    sleep 2
+
+                    curl --fail http://localhost:${APP_PORT}
+
+                    echo ""
+                    echo "===== Application Health Check Passed ====="
                 '''
             }
         }
